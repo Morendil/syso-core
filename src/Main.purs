@@ -1,5 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log)
+data Constant = Constant Number
 
-main = log "Hello, World!"
+eval :: Constant -> Number
+eval (Constant num) = num
