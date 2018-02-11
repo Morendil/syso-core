@@ -1,7 +1,7 @@
 {
     "name": "app",
-    "set": "psc-0.11.7",
-    "source": "https://github.com/purescript/package-sets.git",
+    "set": "master",
+    "source": "https://github.com/Morendil/package-sets.git",
     "depends": [
         "test-unit",
         "console",
