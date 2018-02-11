@@ -1,5 +1,6 @@
 .psc-ide-port
 .psc-package
+.psci_modules
 output
 node_modules
 yarn.lock
