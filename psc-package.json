@@ -3,6 +3,9 @@
     "set": "master",
     "source": "https://github.com/Morendil/package-sets.git",
     "depends": [
+        "simple-json",
+        "psci-support",
+        "yaml",
         "test-unit",
         "console",
         "eff",
