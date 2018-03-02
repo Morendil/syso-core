@@ -38,6 +38,11 @@ analysis = suite "Analysis" do
         analyzed = analyse rules ["foo"] empty
     equal (Numeric 1.0) (valueOf analyzed "foo")
 
+  test "Evaluate Sum" do
+    let rules = [Rule "" "foo" (Sum [Constant 1.0, Constant 1.0])]
+        analyzed = analyse rules ["foo"] empty
+    equal (Numeric 2.0) (valueOf analyzed "foo")
+
   test "Evaluate Uncomputed" do
     let rules = [Rule "" "bar" (Constant 1.0)]
         analyzed = analyse rules ["foo"] empty

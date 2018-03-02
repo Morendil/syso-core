@@ -41,6 +41,7 @@ instance showRule :: Show Rule where
 data Formula =
     Constant Number |
     VariableReference VariableName |
+    Sum (Array Formula) |
     Mult { assiette :: Formula, taux :: Formula, plafond :: Formula }
 derive instance eqFormula :: Eq Formula
 derive instance gForm :: Generic Formula _
@@ -55,15 +56,23 @@ findRule rules query =
     let isNamed q = (\ (Rule ns name _) -> (ns == "" && name == q) || (ns <> " . " <> name) ==  q)
     in head $ filter (isNamed query) rules
 
-eval :: Rules -> Analysis -> VariableName -> Evaluated
-eval rules analysis name = case findRule rules name of
-    (Just (Rule _ _ (Constant num))) -> Evaluated (Numeric num)
-    _ -> Evaluated Uncomputed
+evaluate :: Rules -> Analysis -> VariableName -> Evaluated
+evaluate rules analysis name =
+    let evalNumeric formula = case evalFormula formula of
+            Numeric num -> num
+            _ -> 0.0
+        evalFormula formula = case formula of
+            Constant num -> Numeric num
+            Sum values -> Numeric (sum $ map evalNumeric values)
+            _ -> Uncomputed
+    in case findRule rules name of
+        (Just (Rule _ _ f)) -> Evaluated $ evalFormula f
+        _ -> Evaluated Uncomputed
 
 analyse :: Rules -> Targets -> Situation -> Analysis
 analyse rules targets situation =
     let preanalysis = mapWithIndex (\ name value -> Evaluated value) situation
-        store target storage = insert target (eval rules preanalysis target) storage
+        store target storage = insert target (evaluate rules preanalysis target) storage
     in foldr store empty targets
 
 valueOf :: Analysis -> String -> Value
