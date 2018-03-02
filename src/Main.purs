@@ -2,16 +2,18 @@ module Main where
 
 import Prelude
 
+import Control.Monad.Except
+import Data.Array hiding (mapWithIndex,insert)
 import Data.Either
 import Data.Foldable
-import Data.FunctorWithIndex
-import Data.List.Types
 import Data.Foreign
-import Data.StrMap
-import Data.YAML.Foreign.Decode
+import Data.FunctorWithIndex
 import Data.Generic.Rep
 import Data.Generic.Rep.Show
-import Control.Monad.Except
+import Data.List.Types
+import Data.Maybe
+import Data.StrMap hiding (filter)
+import Data.YAML.Foreign.Decode
 
 type VariableName = String
 type NameSpace = VariableName
@@ -31,17 +33,32 @@ instance showValue :: Show Value where
 data Evaluated = Evaluated Value | Unknown Missing
 
 data Rule = Rule NameSpace VariableName Formula
+derive instance eqRule :: Eq Rule
+derive instance gRule :: Generic Rule _
+instance showRule :: Show Rule where
+    show x = genericShow x
 
 data Formula =
     Constant Number |
     VariableReference VariableName |
     Mult { assiette :: Formula, taux :: Formula, plafond :: Formula }
+derive instance eqFormula :: Eq Formula
+derive instance gForm :: Generic Formula _
+instance showForm :: Show Formula where
+    show x = genericShow x
 
 mult assiette taux plafond =
   (min assiette plafond) * taux
 
+findRule :: Rules -> String -> Maybe Rule
+findRule rules query =
+    let isNamed q = (\ (Rule ns name _) -> (ns == "" && name == q) || (ns <> " . " <> name) ==  q)
+    in head $ filter (isNamed query) rules
+
 eval :: Rules -> Analysis -> VariableName -> Evaluated
-eval _ _ _ = Evaluated Uncomputed
+eval rules analysis name = case findRule rules name of
+    (Just (Rule _ _ (Constant num))) -> Evaluated (Numeric num)
+    _ -> Evaluated Uncomputed
 
 analyse :: Rules -> Targets -> Situation -> Analysis
 analyse rules targets situation =
@@ -50,7 +67,9 @@ analyse rules targets situation =
     in foldr store empty targets
 
 valueOf :: Analysis -> String -> Value
-valueOf _ _ = Uncomputed
+valueOf analysis name = case lookup name analysis of
+    (Just (Evaluated value)) -> value
+    _ -> Uncomputed
 
 missingVariables :: Analysis -> String -> Array String
 missingVariables _ _ = []

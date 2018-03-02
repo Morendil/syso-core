@@ -4,6 +4,7 @@ import Main
 
 import Prelude
 import Data.Either
+import Data.Maybe
 import Data.StrMap (StrMap, empty)
 
 import Test.Unit (suite, test)
@@ -15,12 +16,20 @@ import Test.QuickCheck ((===))
 
 main = runTest do
   parsing
+  rulebase
   analysis
 
 allRules = """
 - nom: nombre
   formule: 1
 """
+
+rulebase = suite "Rule base" do
+
+  test "Find a rule" do
+    let rule1 = Rule "" "foo" (Constant 1.0)
+        rules = [rule1]
+    equal (Just rule1) (findRule rules "foo")
 
 analysis = suite "Analysis" do
 
