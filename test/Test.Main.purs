@@ -14,29 +14,30 @@ import Test.Unit.Assert
 import Test.QuickCheck ((===))
 
 main = runTest do
-  suite "Evaluation" do
-    test "Constants eval to themselves" do
-      quickCheck $ \ num -> eval (Constant num) === num
   parsing
-  evaluation
+  analysis
 
-rules = """
+allRules = """
 - nom: nombre
   formule: 1
 """
 
-emptyDict = empty :: StrMap Number
+analysis = suite "Analysis" do
 
-evaluation = suite "Evaluation" do
-  test "Evaluate with an empty map" do
-    equal (valueOf "nombre" emptyDict holder) 1.0
-    where
-      holder = case parseRules rules of
-        Right result -> result
-        Left error -> Rules
+  test "Evaluate Constant" do
+    let rules = [Rule "" "foo" (Constant 1.0)]
+        analyzed = analyse rules ["foo"] empty
+    equal (Numeric 1.0) (valueOf analyzed "foo")
+
+  test "Evaluate Uncomputed" do
+    let rules = [Rule "" "bar" (Constant 1.0)]
+        analyzed = analyse rules ["foo"] empty
+    equal (Uncomputed) (valueOf analyzed "foo")
 
 parsing = suite "Parsing YAML representations" do
+
   test "Parse valid representation" do
-    assert "Parse failed" $ isRight (parseRules rules)
+    assert "Parse failed" $ isRight (parseRules allRules)
+
   test "Parse invalid representation" do
     assert "Parse should fail" $ isLeft (parseRules ": a :")
