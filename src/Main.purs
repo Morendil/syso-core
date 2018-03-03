@@ -22,11 +22,10 @@ type NameSpace = VariableName
 type Targets = Array VariableName
 type Missing = Array VariableName
 type Rules = Array Rule
-type Analysis = StrMap Evaluated
+type Analysis = StrMap (Maybe Value)
 type Situation = StrMap Value
-type Value = Number
 
-data Evaluated = Evaluated (Maybe Value)
+type Value = Number
 
 data Rule = Rule NameSpace VariableName Formula
 derive instance eqRule :: Eq Rule
@@ -52,29 +51,24 @@ findRule rules query =
     let isNamed q = (\ (Rule ns name _) -> (ns == "" && name == q) || (ns <> " . " <> name) ==  q)
     in head $ filter (isNamed query) rules
 
-evaluate :: Rules -> Analysis -> VariableName -> Evaluated
+evaluate :: Rules -> Analysis -> VariableName -> Maybe Value
 evaluate rules analysis name =
-    let unwrap formula =
-            let (Evaluated unwrapped) = evalFormula formula
-            in unwrapped
-        evalFormula formula = case formula of
-            Constant num -> Evaluated (Just num)
-            Sum values -> Evaluated (map sum $ sequence $ map unwrap values)
-            _ -> Evaluated Nothing
+    let evalFormula formula = case formula of
+            Constant num -> Just num
+            Sum values -> map sum $ sequence $ map evalFormula values
+            _ -> Nothing
     in case findRule rules name of
         (Just (Rule _ _ f)) -> evalFormula f
-        _ -> Evaluated Nothing
+        _ -> Nothing
 
 analyse :: Rules -> Targets -> Situation -> Analysis
 analyse rules targets situation =
-    let preanalysis = map (\ value -> Evaluated (Just value)) situation
+    let preanalysis = map (\ value -> Just value) situation
         store target storage = insert target (evaluate rules preanalysis target) storage
     in foldr store empty targets
 
 valueOf :: Analysis -> String -> Maybe Value
-valueOf analysis name = case lookup name analysis of
-    Just (Evaluated value) -> value
-    Nothing -> Nothing
+valueOf analysis name = join $ lookup name analysis
 
 missingVariables :: Analysis -> String -> Array String
 missingVariables _ _ = []
