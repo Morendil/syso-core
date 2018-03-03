@@ -6,6 +6,7 @@ import Control.Monad.Except
 import Data.Array hiding (mapWithIndex,insert)
 import Data.Either
 import Data.Foldable
+import Data.Traversable
 import Data.Foreign
 import Data.FunctorWithIndex
 import Data.Generic.Rep
@@ -23,14 +24,9 @@ type Missing = Array VariableName
 type Rules = Array Rule
 type Analysis = StrMap Evaluated
 type Situation = StrMap Value
+type Value = Number
 
-data Value = Numeric Number | Logic Boolean | Textual String | Uncomputed
-derive instance eqValue :: Eq Value
-derive instance gValue :: Generic Value _
-instance showValue :: Show Value where
-    show x = genericShow x
-
-data Evaluated = Evaluated Value | Unknown Missing
+data Evaluated = Evaluated (Maybe Value)
 
 data Rule = Rule NameSpace VariableName Formula
 derive instance eqRule :: Eq Rule
@@ -58,27 +54,27 @@ findRule rules query =
 
 evaluate :: Rules -> Analysis -> VariableName -> Evaluated
 evaluate rules analysis name =
-    let evalNumeric formula = case evalFormula formula of
-            Numeric num -> num
-            _ -> 0.0
+    let unwrap formula =
+            let (Evaluated unwrapped) = evalFormula formula
+            in unwrapped
         evalFormula formula = case formula of
-            Constant num -> Numeric num
-            Sum values -> Numeric (sum $ map evalNumeric values)
-            _ -> Uncomputed
+            Constant num -> Evaluated (Just num)
+            Sum values -> Evaluated (map sum $ sequence $ map unwrap values)
+            _ -> Evaluated Nothing
     in case findRule rules name of
-        (Just (Rule _ _ f)) -> Evaluated $ evalFormula f
-        _ -> Evaluated Uncomputed
+        (Just (Rule _ _ f)) -> evalFormula f
+        _ -> Evaluated Nothing
 
 analyse :: Rules -> Targets -> Situation -> Analysis
 analyse rules targets situation =
-    let preanalysis = mapWithIndex (\ name value -> Evaluated value) situation
+    let preanalysis = map (\ value -> Evaluated (Just value)) situation
         store target storage = insert target (evaluate rules preanalysis target) storage
     in foldr store empty targets
 
-valueOf :: Analysis -> String -> Value
+valueOf :: Analysis -> String -> Maybe Value
 valueOf analysis name = case lookup name analysis of
-    (Just (Evaluated value)) -> value
-    _ -> Uncomputed
+    Just (Evaluated value) -> value
+    Nothing -> Nothing
 
 missingVariables :: Analysis -> String -> Array String
 missingVariables _ _ = []
