@@ -16,6 +16,7 @@ main = runTest do
   parsing
   rulebase
   analysis
+  missing
 
 allRules = """
 - nom: nombre
@@ -50,6 +51,18 @@ analysis = suite "Analysis" do
     let rules = [Rule "" "bar" (Constant 1.0)]
         analyzed = analyse rules ["foo"] empty
     equal Nothing (valueOf analyzed "foo")
+
+missing = suite "Missing variables" do
+
+  test "Constant never has missing variables" do
+    let rules = [Rule "" "foo" (Constant 1.0)]
+        analyzed = analyse rules ["foo"] empty
+    equal [] (missingVariables analyzed "foo")
+
+  test "VariableReference adds a missing if absent in situation" do
+    let rules = [Rule "" "foo" (VariableReference "bar")]
+        analyzed = analyse rules ["foo"] empty
+    equal ["bar"] (missingVariables analyzed "foo")
 
 parsing = suite "Parsing YAML representations" do
 

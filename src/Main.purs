@@ -26,6 +26,7 @@ type Analysis = StrMap (Maybe Value)
 type Situation = StrMap Value
 
 type Value = Number
+type Operator = String
 
 data Rule = Rule NameSpace VariableName Formula
 derive instance eqRule :: Eq Rule
@@ -37,10 +38,22 @@ data Formula =
     Constant Number |
     VariableReference VariableName |
     Sum (Array Formula) |
-    Mult { assiette :: Formula, taux :: Formula, plafond :: Formula }
+    Mult { assiette :: Formula, taux :: Formula, plafond :: Formula } |
+    IfCondition BooleanFormula Formula |
+    UnlessCondition BooleanFormula Formula
 derive instance eqFormula :: Eq Formula
 derive instance gForm :: Generic Formula _
 instance showForm :: Show Formula where
+    show x = genericShow x
+
+data BooleanFormula =
+	NumericComparison Operator Formula Formula |
+	OneOfThese (Array BooleanFormula) |
+	AnyOfThese (Array BooleanFormula) |
+	EnumSelected VariableName
+derive instance eqBooleanFormula :: Eq BooleanFormula
+derive instance gBooleanFormula :: Generic BooleanFormula _
+instance showBooleanFormula :: Show BooleanFormula where
     show x = genericShow x
 
 mult assiette taux plafond =
