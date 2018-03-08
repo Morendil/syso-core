@@ -6,7 +6,7 @@ import Main
 import Prelude
 import Test.Unit.Assert
 
-import Data.StrMap (StrMap, empty)
+import Data.StrMap (StrMap, insert, empty)
 import Test.QuickCheck ((===))
 import Test.Unit (suite, test)
 import Test.Unit.Main (runTest)
@@ -17,18 +17,6 @@ main = runTest do
   rulebase
   analysis
   missing
-
-allRules = """
-- nom: nombre
-  formule: 1
-"""
-
-rulebase = suite "Rule base" do
-
-  test "Find a rule" do
-    let rule1 = Rule "" "foo" (Constant 1.0)
-        rules = [rule1]
-    equal (Just rule1) (findRule rules "foo")
 
 analysis = suite "Analysis" do
 
@@ -63,6 +51,33 @@ missing = suite "Missing variables" do
     let rules = [Rule "" "foo" (VariableReference "bar")]
         analyzed = analyse rules ["foo"] empty
     equal ["bar"] (missingVariables analyzed "foo")
+
+  test "VariableReference doesn't add a missing if provided in situation" do
+    let rules = [Rule "" "foo" (VariableReference "bar")]
+        analyzed = analyse rules ["foo"] (insert "bar" 1.0 empty)
+    equal [] (missingVariables analyzed "foo")
+
+  test "Sum propagates missing variables absent in situation" do
+    let rules = [Rule "" "foo" (Sum [Constant 1.0, VariableReference "bar"])]
+        analyzed = analyse rules ["foo"] empty
+    equal ["bar"] (missingVariables analyzed "foo")
+
+  test "Sum doesn't propagate as missing variables provided in situation" do
+    let rules = [Rule "" "foo" (Sum [VariableReference "bar", Constant 1.0])]
+        analyzed = analyse rules ["foo"] (insert "bar" 1.0 empty)
+    equal [] (missingVariables analyzed "foo")
+
+allRules = """
+- nom: nombre
+  formule: 1
+"""
+
+rulebase = suite "Rule base" do
+
+  test "Find a rule" do
+    let rule1 = Rule "" "foo" (Constant 1.0)
+        rules = [rule1]
+    equal (Just rule1) (findRule rules "foo")
 
 parsing = suite "Parsing YAML representations" do
 
