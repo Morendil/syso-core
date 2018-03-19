@@ -35,7 +35,12 @@ analysis = suite "Analysis" do
         analyzed = analyse rules ["foo"] empty
     equal Nothing (valueOf analyzed "foo")
 
-  test "Evaluate Uncomputed" do
+  test "Evaluate Sum with variable supplied in situation" do
+    let rules = [Rule "" "foo" (Sum [Constant 1.0, VariableReference "bar"])]
+        analyzed = analyse rules ["foo"] (insert "bar" 2.0 empty)
+    equal (Just 3.0) (valueOf analyzed "foo")
+
+  test "Evaluate unknown variable" do
     let rules = [Rule "" "bar" (Constant 1.0)]
         analyzed = analyse rules ["foo"] empty
     equal Nothing (valueOf analyzed "foo")

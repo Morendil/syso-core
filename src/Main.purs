@@ -71,6 +71,9 @@ evaluate :: Rules -> Analysis -> VariableName -> Maybe Value
 evaluate rules analysis name =
     let evalFormula formula = case formula of
             Constant num -> Just num
+            VariableReference var -> case lookup var analysis of
+                Just (Left value) -> Just value
+                _ -> Nothing
             Sum components -> map sum $ sequence $ map evalFormula components
             _ -> Nothing
     in case findRule rules name of
