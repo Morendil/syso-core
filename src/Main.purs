@@ -82,7 +82,7 @@ evaluate rules analysis name =
             Constant num -> Just num
             VariableReference var -> case lookup var analysis of
                 Just (Left value) -> Just value
-                _ -> Nothing
+                _ -> evaluate rules analysis var
             Sum components -> map sum $ sequence components
     in case findRule rules name of
         (Just (Rule _ _ f)) -> (cata evalFormula) f
