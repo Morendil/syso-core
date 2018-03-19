@@ -1,6 +1,10 @@
 module Main where
 
 import Control.Monad.Except
+import Data.Functor.Mu (Mu)
+import Data.TacitString
+import Data.Eq (class Eq1, eq1)
+import Matryoshka (class Corecursive, class Recursive, Algebra, cata, embed)
 import Data.Array hiding (mapWithIndex,insert)
 import Data.Either
 import Data.Foldable
@@ -18,14 +22,30 @@ import Prelude
 import Data.Array (concatMap)
 
 data Rule = Rule NameSpace VariableName Formula
+derive instance eqRule :: Eq Rule
+derive instance gRule :: Generic Rule _
+instance showRule :: Show Rule where
+    show x = genericShow x
 
-data Formula =
+type Formula = Mu FormulaF
+data FormulaF a =
     Constant Number |
     VariableReference VariableName |
-    Sum (Array Formula)
+    Sum (Array a)
     -- | Mult { assiette :: Formula, taux :: Formula, plafond :: Formula } |
     -- IfCondition BooleanFormula Formula |
     -- UnlessCondition BooleanFormula Formula
+
+derive instance functorFomulaF :: Functor FormulaF
+derive instance gFormula :: Generic (FormulaF TacitString) _
+instance showFormula :: Show (FormulaF TacitString) where
+    show x = genericShow x
+
+instance eq1FormulaF :: Eq1 FormulaF where
+    eq1 (Constant n1) (Constant n2) = eq n1 n2
+    eq1 (VariableReference n1) (VariableReference n2) = eq n1 n2
+    eq1 (Sum n1) (Sum n2) = eq n1 n2
+    eq1 _ _ = false
 
 type VariableName = String
 type NameSpace = VariableName
@@ -39,25 +59,17 @@ type Situation = StrMap Value
 type Value = Number
 type Operator = String
 
-derive instance eqRule :: Eq Rule
-derive instance gRule :: Generic Rule _
-instance showRule :: Show Rule where
-    show x = genericShow x
-
-derive instance eqFormula :: Eq Formula
-derive instance gForm :: Generic Formula _
-instance showForm :: Show Formula where
-    show x = genericShow x
-
-data BooleanFormula =
+{-data BooleanFormula =
     NumericComparison Operator Formula Formula |
     OneOfThese (Array BooleanFormula) |
     AnyOfThese (Array BooleanFormula) |
     EnumSelected VariableName
-derive instance eqBooleanFormula :: Eq BooleanFormula
-derive instance gBooleanFormula :: Generic BooleanFormula _
-instance showBooleanFormula :: Show BooleanFormula where
-    show x = genericShow x
+-}
+
+-- Fixed point constructors
+sumf items = embed (Sum items)
+constantf value = embed (Constant value)
+variableref var = embed (VariableReference var)
 
 mult assiette taux plafond =
   (min assiette plafond) * taux
@@ -74,10 +86,9 @@ evaluate rules analysis name =
             VariableReference var -> case lookup var analysis of
                 Just (Left value) -> Just value
                 _ -> Nothing
-            Sum components -> map sum $ sequence $ map evalFormula components
-            _ -> Nothing
+            Sum components -> map sum $ sequence components
     in case findRule rules name of
-        (Just (Rule _ _ f)) -> evalFormula f
+        (Just (Rule _ _ f)) -> (cata evalFormula) f
         _ -> Nothing
 
 computeMissing :: Rules -> Analysis -> VariableName -> Array VariableName
@@ -87,10 +98,9 @@ computeMissing rules analysis name =
             VariableReference var -> case lookup var analysis of
                 Just (Left value) -> []
                 _ -> [var]
-            Sum components -> concatMap missingInFormula components
-            _ -> []
+            Sum components -> concat components
     in case findRule rules name of
-        (Just (Rule _ _ f)) -> missingInFormula f
+        (Just (Rule _ _ f)) -> (cata missingInFormula) f
         _ -> [name]
 
 analyse :: Rules -> Targets -> Situation -> Analysis
