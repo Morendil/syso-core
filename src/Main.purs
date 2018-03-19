@@ -6,17 +6,21 @@ import Control.Monad.Except (runExcept)
 import Data.Array (concat, filter, head)
 import Data.Either (Either(..))
 import Data.Eq (class Eq1)
+import Data.Foldable (class Foldable, foldMap, foldlDefault, foldrDefault)
 import Data.Foreign (ForeignError)
 import Data.Functor.Mu (Mu)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Identity (Identity)
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..))
+import Data.Monoid (mempty)
+import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Data.TacitString (TacitString)
-import Data.Traversable (foldr, sequence, sum)
+import Data.Traversable (class Traversable, sequenceDefault, foldr, traverse, sequence, sum)
 import Data.YAML.Foreign.Decode (parseYAMLToJson)
-import Matryoshka (Algebra, cata, embed)
+import Matryoshka (Algebra, AlgebraM, cata, cataM, embed)
 
 data Rule = Rule NameSpace VariableName Formula
 derive instance eqRule :: Eq Rule
@@ -37,6 +41,18 @@ derive instance functorFomulaF :: Functor FormulaF
 derive instance gFormula :: Generic (FormulaF TacitString) _
 instance showFormula :: Show (FormulaF TacitString) where
     show x = genericShow x
+instance traversableFormulaF :: Traversable FormulaF where
+  -- traverse :: forall a b m. Applicative m => (a -> m b) -> t a -> m (t b)
+  traverse f (Sum children) = Sum <$> traverse f children
+  traverse f (Constant v) = pure (Constant v)
+  traverse f (VariableReference v) = pure (VariableReference v)
+  sequence f = sequenceDefault f
+instance foldableFormulaF :: Foldable FormulaF where
+  foldr f = foldrDefault f
+  foldl f = foldlDefault f
+  -- foldMap :: forall a m. Monoid m => (a -> m) -> f a -> m
+  foldMap f (Sum children) = foldMap f children
+  foldMap f _ = mempty
 
 instance eq1FormulaF :: Eq1 FormulaF where
     eq1 (Constant n1) (Constant n2) = eq n1 n2
@@ -96,10 +112,18 @@ missingAlgebra rules analysis formula = case formula of
         _ -> [var]
     Sum components -> concat components
 
+missingAlgebraM :: Rules -> Analysis -> AlgebraM Identity FormulaF Missing
+missingAlgebraM rules analysis formula = case formula of
+    Constant num -> pure []
+    VariableReference var -> case lookup var analysis of
+        Just (Left value) -> pure []
+        _ -> pure [var]
+    Sum components -> pure $ concat components
+
 computeMissing :: Rules -> Analysis -> VariableName -> Array VariableName
 computeMissing rules analysis name =
     case findRule rules name of
-        (Just (Rule _ _ f)) -> (cata $ missingAlgebra rules analysis) f
+        (Just (Rule _ _ f)) -> unwrap $ (cataM $ missingAlgebraM rules analysis) f
         _ -> [name]
 
 analyse :: Rules -> Targets -> Situation -> Analysis
