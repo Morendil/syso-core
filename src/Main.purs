@@ -88,16 +88,18 @@ evaluate rules analysis name =
         (Just (Rule _ _ f)) -> (cata evalFormula) f
         _ -> Nothing
 
+missingAlgebra :: Rules -> Analysis -> Algebra FormulaF Missing
+missingAlgebra rules analysis formula = case formula of
+    Constant num -> []
+    VariableReference var -> case lookup var analysis of
+        Just (Left value) -> []
+        _ -> [var]
+    Sum components -> concat components
+
 computeMissing :: Rules -> Analysis -> VariableName -> Array VariableName
 computeMissing rules analysis name =
-    let missingInFormula formula = case formula of
-            Constant num -> []
-            VariableReference var -> case lookup var analysis of
-                Just (Left value) -> []
-                _ -> [var]
-            Sum components -> concat components
-    in case findRule rules name of
-        (Just (Rule _ _ f)) -> (cata missingInFormula) f
+    case findRule rules name of
+        (Just (Rule _ _ f)) -> (cata $ missingAlgebra rules analysis) f
         _ -> [name]
 
 analyse :: Rules -> Targets -> Situation -> Analysis
