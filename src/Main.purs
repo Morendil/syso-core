@@ -1,25 +1,22 @@
 module Main where
 
-import Control.Monad.Except
-import Data.Functor.Mu (Mu)
-import Data.TacitString
-import Data.Eq (class Eq1, eq1)
-import Matryoshka (class Corecursive, class Recursive, Algebra, cata, embed)
-import Data.Array hiding (mapWithIndex,insert)
-import Data.Either
-import Data.Foldable
-import Data.Foreign
-import Data.FunctorWithIndex
-import Data.Generic.Rep
-import Data.Generic.Rep.Show
-import Data.List.Types
-import Data.Maybe
-import Data.StrMap hiding (filter)
-import Data.Traversable
-import Data.YAML.Foreign.Decode
+import Control.Monad.Except (runExcept)
+import Data.Array (concat, filter, head)
+import Data.Either (Either(..))
+import Data.Foreign (ForeignError)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.List.Types (NonEmptyList)
+import Data.Maybe (Maybe(..))
+import Data.StrMap (StrMap, empty, insert, lookup)
+import Data.TacitString (TacitString)
+import Data.Traversable (foldr, sequence, sum)
+import Data.YAML.Foreign.Decode (parseYAMLToJson)
 import Prelude
 
-import Data.Array (concatMap)
+import Data.Eq (class Eq1)
+import Data.Functor.Mu (Mu)
+import Matryoshka (cata, embed)
 
 data Rule = Rule NameSpace VariableName Formula
 derive instance eqRule :: Eq Rule
