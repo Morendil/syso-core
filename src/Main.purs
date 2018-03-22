@@ -2,6 +2,7 @@ module Main where
 
 import Prelude
 
+import Control.Monad.State (State, evalState, get, put)
 import Control.Monad.Except (runExcept)
 import Data.Array (concat, filter, head)
 import Data.Either (Either(..))
@@ -11,11 +12,9 @@ import Data.Foreign (ForeignError)
 import Data.Functor.Mu (Mu)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Identity (Identity)
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
-import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Data.TacitString (TacitString)
 import Data.Traversable (class Traversable, sequenceDefault, foldr, traverse, sequence, sum)
@@ -66,7 +65,8 @@ type NameSpace = VariableName
 type Targets = Array VariableName
 type Missing = Array VariableName
 type Rules = Array Rule
-type Analysis = StrMap (Either Value (Array VariableName))
+type Analyzed = Either Value Missing
+type Analysis = StrMap Analyzed
 type Situation = StrMap Value
 
 type Value = Number
@@ -112,18 +112,27 @@ missingAlgebra rules analysis formula = case formula of
         _ -> [var]
     Sum components -> concat components
 
-missingAlgebraM :: Rules -> Analysis -> AlgebraM Identity FormulaF Missing
-missingAlgebraM rules analysis formula = case formula of
+missingAlgebraM :: Rules -> AlgebraM (State Analysis) FormulaF Missing
+missingAlgebraM rules formula = case formula of
     Constant num -> pure []
-    VariableReference var -> case lookup var analysis of
-        Just (Left value) -> pure []
-        _ -> pure [var]
+    VariableReference var -> do
+            analysis <- get
+            let cached = lookup var analysis
+            case cached of
+                Just (Left value) -> pure []
+                Just (Right missing) -> pure missing
+                Nothing -> do
+                    put $ insert var (Right [var]) analysis
+                    pure [var]
     Sum components -> pure $ concat components
 
-computeMissing :: Rules -> Analysis -> VariableName -> Array VariableName
+computeMissing :: Rules -> Analysis -> VariableName -> Missing
 computeMissing rules analysis name =
     case findRule rules name of
-        (Just (Rule _ _ f)) -> unwrap $ (cataM $ missingAlgebraM rules analysis) f
+        (Just (Rule _ _ f)) ->
+            let state = (cataM $ missingAlgebraM rules) f :: State Analysis Missing
+                value = evalState state analysis :: Missing
+            in value
         _ -> [name]
 
 analyse :: Rules -> Targets -> Situation -> Analysis
