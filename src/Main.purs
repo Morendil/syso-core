@@ -105,7 +105,15 @@ analyseAlgebra rules formula = case formula of
                     let (Tuple result updated) = compute rules analysis var
                     put (insert var result updated)
                     pure result
-    Sum components -> pure $ sum components
+    Sum components -> pure $ reduceWith (+) (<>) (Right 0.0) components
+
+reduceWith :: (Value -> Value -> Value) -> (Missing -> Missing -> Missing) -> Analyzed -> Array Analyzed -> Analyzed
+reduceWith combineValues concatMissing init analyzeds =
+    let combine m1 @ (Left missing) (Right _) = m1
+        combine (Right _) m2 @ (Left missing) = m2
+        combine (Left m1) (Left m2) = Left $ concatMissing m1 m2
+        combine (Right v1) (Right v2) = Right $ combineValues v1 v2
+    in foldr combine init analyzeds
 
 compute :: Rules -> Analysis -> VariableName -> Tuple Analyzed Analysis
 compute rules analysis name =
