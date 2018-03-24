@@ -1,23 +1,27 @@
 module Test.Main where
 
-import Data.Either (isLeft, isRight)
-import Data.Maybe
 import Main
+
 import Prelude
-import Test.Unit.Assert
 
-import Data.StrMap (StrMap, insert, empty)
-import Test.QuickCheck ((===))
-import Test.Unit (suite, test)
+import Control.Monad.Free (Free)
+import Control.Monad.Eff (Eff)
+import Data.Either (isLeft, isRight)
+import Data.Maybe (Maybe(..))
+import Test.Unit.Assert (assert, equal)
+
+import Data.StrMap (empty, insert)
+import Test.Unit (TestF, suite, test)
 import Test.Unit.Main (runTest)
-import Test.Unit.QuickCheck (quickCheck)
 
+main :: Eff (_) Unit
 main = runTest do
   parsing
   rulebase
   analysis
   missing
 
+analysis :: forall a. Free (TestF a) Unit
 analysis = suite "Analysis" do
 
   test "Evaluate Constant" do
@@ -51,6 +55,7 @@ analysis = suite "Analysis" do
         analyzed = analyse rules ["foo"] empty
     equal Nothing (valueOf analyzed "foo")
 
+missing :: forall a. Free (TestF a) Unit
 missing = suite "Missing variables" do
 
   test "Constant never has missing variables" do
@@ -78,11 +83,13 @@ missing = suite "Missing variables" do
         analyzed = analyse rules ["foo"] (insert "bar" 1.0 empty)
     equal [] (missingVariables analyzed "foo")
 
+allRules :: String
 allRules = """
 - nom: nombre
   formule: 1
 """
 
+rulebase  :: forall a. Free (TestF a) Unit
 rulebase = suite "Rule base" do
 
   test "Find a rule" do
@@ -90,6 +97,7 @@ rulebase = suite "Rule base" do
         rules = [rule1]
     equal (Just rule1) (findRule rules "foo")
 
+parsing :: forall a. Free (TestF a) Unit
 parsing = suite "Parsing YAML representations" do
 
   test "Parse valid representation" do
