@@ -78,6 +78,11 @@ missing = suite "Missing variables" do
         analyzed = analyse rules ["foo"] empty
     equal ["bar"] (missingVariables analyzed "foo")
 
+  test "Sum concatenates missing variables" do
+    let rules = [Rule "" "foo" (sumf [variableref "bar", variableref "qux"])]
+        analyzed = analyse rules ["foo"] empty
+    equal ["bar", "qux"] (missingVariables analyzed "foo")
+
   test "Sum doesn't propagate as missing variables provided in situation" do
     let rules = [Rule "" "foo" (sumf [variableref "bar", constantf 1.0])]
         analyzed = analyse rules ["foo"] (insert "bar" 1.0 empty)
