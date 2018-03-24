@@ -1,6 +1,6 @@
 module Test.Main where
 
-import Data.Either
+import Data.Either (isLeft, isRight)
 import Data.Maybe
 import Main
 import Prelude

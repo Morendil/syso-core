@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 
-import Control.Monad.State (State, evalState, get, put)
 import Control.Monad.Except (runExcept)
+import Control.Monad.State (State, runState, get, put)
 import Data.Array (concat, filter, head)
 import Data.Either (Either(..))
 import Data.Eq (class Eq1)
@@ -17,6 +17,7 @@ import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Data.TacitString (TacitString)
+import Data.Tuple (Tuple(..))
 import Data.Traversable (class Traversable, sequenceDefault, foldr, traverse, sequence, sum)
 import Data.YAML.Foreign.Decode (parseYAMLToJson)
 import Matryoshka (Algebra, AlgebraM, cata, cataM, embed)
@@ -65,7 +66,7 @@ type NameSpace = VariableName
 type Targets = Array VariableName
 type Missing = Array VariableName
 type Rules = Array Rule
-type Analyzed = Either Value Missing
+type Analyzed = Either Missing Value
 type Analysis = StrMap Analyzed
 type Situation = StrMap Value
 
@@ -92,70 +93,49 @@ findRule rules query =
     let isNamed q = (\ (Rule ns name _) -> (ns == "" && name == q) || (ns <> " . " <> name) ==  q)
     in head $ filter (isNamed query) rules
 
-evaluate :: Rules -> Analysis -> VariableName -> Maybe Value
-evaluate rules analysis name =
-    let evalFormula formula = case formula of
-            Constant num -> Just num
-            VariableReference var -> case lookup var analysis of
-                Just (Left value) -> Just value
-                _ -> evaluate rules analysis var
-            Sum components -> map sum $ sequence components
-    in case findRule rules name of
-        (Just (Rule _ _ f)) -> (cata evalFormula) f
-        _ -> Nothing
-
-missingAlgebra :: Rules -> Analysis -> Algebra FormulaF Missing
-missingAlgebra rules analysis formula = case formula of
-    Constant num -> []
-    VariableReference var -> case lookup var analysis of
-        Just (Left value) -> []
-        _ -> [var]
-    Sum components -> concat components
-
-missingAlgebraM :: Rules -> AlgebraM (State Analysis) FormulaF Missing
-missingAlgebraM rules formula = case formula of
-    Constant num -> pure []
+analyseAlgebra :: Rules -> AlgebraM (State Analysis) FormulaF Analyzed
+analyseAlgebra rules formula = case formula of
+    Constant num -> pure (Right num)
     VariableReference var -> do
             analysis <- get
             let cached = lookup var analysis
             case cached of
-                Just (Left value) -> pure []
-                Just (Right missing) -> pure missing
+                Just analysed -> pure analysed
                 Nothing -> do
-                    put $ insert var (Right [var]) analysis
-                    pure [var]
-    Sum components -> pure $ concat components
+                    let (Tuple result updated) = compute rules analysis var
+                    put (insert var result updated)
+                    pure result
+    Sum components -> pure $ sum components
 
-computeMissing :: Rules -> Analysis -> VariableName -> Missing
-computeMissing rules analysis name =
+compute :: Rules -> Analysis -> VariableName -> Tuple Analyzed Analysis
+compute rules analysis name =
     case findRule rules name of
-        (Just (Rule _ _ f)) ->
-            let state = (cataM $ missingAlgebraM rules) f :: State Analysis Missing
-                value = evalState state analysis :: Missing
-            in value
-        _ -> [name]
+        (Just (Rule _ _ formula)) ->
+            let state = (cataM $ analyseAlgebra rules) formula
+                (Tuple result updated) = runState state analysis
+            in Tuple result (insert name result updated)
+        _ ->
+            let error = Left [name]
+            in Tuple error (insert name error analysis)
 
 analyse :: Rules -> Targets -> Situation -> Analysis
 analyse rules targets situation =
-    let preanalysis = map (\ value -> Left value) situation
-        maybeValue target = evaluate rules preanalysis target
-        missingVars target = computeMissing rules preanalysis target
-        evalOrMissing target = case maybeValue target of
-            Nothing -> Right (missingVars target)
-            Just value -> Left value
-        store target storage = insert target (evalOrMissing target) storage
-    in foldr store empty targets
+    let preanalysis = map (\ value -> Right value) situation
+        analyseOne name analysis =
+            let (Tuple result analysis) = compute rules analysis name
+            in analysis
+    in foldr analyseOne preanalysis targets
 
 valueOf :: Analysis -> String -> Maybe Value
 valueOf analysis name = case lookup name analysis of
-    Just (Left value) -> Just value
-    Just (Right _) -> Nothing
+    Just (Right value) -> Just value
+    Just (Left _) -> Nothing
     Nothing -> Nothing
 
 missingVariables :: Analysis -> String -> Array String
 missingVariables analysis name = case lookup name analysis of
-    Just (Left value) -> []
-    Just (Right missing) -> missing
+    Just (Right value) -> []
+    Just (Left missing) -> missing
     Nothing -> []
 
 parseRules :: String -> Either (NonEmptyList ForeignError) Rules
