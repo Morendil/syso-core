@@ -1,6 +1,7 @@
 module Test.Main where
 
 import Main
+import Alternate
 import Prelude
 
 import Control.Monad.Eff (Eff)
@@ -15,6 +16,7 @@ import Test.Unit.Main (runTest)
 
 main :: Eff (_) Unit
 main = runTest do
+  alternate
   analysis
   inversion
   missing
@@ -57,6 +59,11 @@ analysis = suite "Analysis" do
     let rules = [Rule "" "bar" (constantf 1.0)]
         analyzed = analyse rules ["foo"] empty
     equal Nothing (valueOf analyzed "foo")
+
+alternate :: forall a. Free (TestF a) Unit
+alternate = suite "Alternate" do
+  test "A stupid test" do
+    equal 1.0 foo
 
 inversion :: forall a. Free (TestF a) Unit
 inversion = suite "Inversion" do

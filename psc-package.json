@@ -3,6 +3,7 @@
     "set": "master",
     "source": "https://github.com/Morendil/package-sets.git",
     "depends": [
+        "leibniz",
         "numbers",
         "matryoshka",
         "simple-json",
