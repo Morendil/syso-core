@@ -21,7 +21,7 @@ main = runTest do
 
 aboutEqual :: forall e. Maybe Number -> Maybe Number -> Test e
 aboutEqual a b = case (Tuple a b) of
-  Tuple (Just va) (Just vb) -> assert ("Approximate comparison failed between" <> (show va) <> "and" <> (show vb)) (va ≅ vb)
+  Tuple (Just va) (Just vb) -> assert ("Approximate comparison failed between " <> (show va) <> " and " <> (show vb)) (va ≅ vb)
   Tuple _ _ -> assert "One of the compared numbers is Nothing" false
 
 analysis :: forall a. Free (TestF a) Unit
