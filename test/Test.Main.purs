@@ -17,11 +17,12 @@ main :: Eff (_) Unit
 main = runTest do
   analysis
   inversion
+  conditional
   missing
 
 aboutEqual :: forall e. Maybe Number -> Maybe Number -> Test e
 aboutEqual a b = case (Tuple a b) of
-  Tuple (Just va) (Just vb) -> assert ("Approximate comparison failed between " <> (show va) <> " and " <> (show vb)) (va ≅ vb)
+  Tuple (Just va) (Just vb) -> assert ("Approximate comparison failed, expected " <> (show va) <> " and got " <> (show vb)) (va ≅ vb)
   Tuple _ _ -> assert "One of the compared numbers is Nothing" false
 
 analysis :: forall a. Free (TestF a) Unit
@@ -68,6 +69,24 @@ inversion = suite "Inversion" do
         analyzed = analyse rules ["brut"] (insert "net" 3.0 empty)
     aboutEqual (Just 1.4) (valueOf analyzed "brut")
 
+conditional :: forall a. Free (TestF a) Unit
+conditional = suite "Conditional" do
+  test "Evaluate Sum controlled by a conditional (true)" do
+    let rules = [Rule "" "net" (sumf [variableref "brut", variableref "taxe"]),
+                 Rule "" "brut" inputf,
+                 Rule "" "taxe" (ifapplicablef (comparef (>) (variableref "brut") (constantf 500.0)) (constantf 200.0))
+                ]
+        analyzed = analyse rules ["net"] (insert "brut" 1000.0 empty)
+    aboutEqual (Just 1200.0) (valueOf analyzed "net")
+
+  test "Evaluate Sum controlled by a conditional (false)" do
+    let rules = [Rule "" "net" (sumf [variableref "brut", variableref "taxe"]),
+                 Rule "" "brut" inputf,
+                 Rule "" "taxe" (ifapplicablef (comparef (>) (variableref "brut") (constantf 500.0)) (constantf 200.0))
+                ]
+        analyzed = analyse rules ["net"] (insert "brut" 400.0 empty)
+    aboutEqual (Just 400.0) (valueOf analyzed "net")
+
 missing :: forall a. Free (TestF a) Unit
 missing = suite "Missing variables" do
 
@@ -100,3 +119,11 @@ missing = suite "Missing variables" do
     let rules = [Rule "" "foo" (sumf [variableref "bar", constantf 1.0])]
         analyzed = analyse rules ["foo"] (insert "bar" 1.0 empty)
     equal [] (missingVariables analyzed "foo")
+
+inputf = Input
+sumf items = Sum items
+constantf value = Constant value
+variableref var = VariableReference var
+inversionf vars = Inversion vars
+ifapplicablef cond value = IfCondition cond value
+comparef f v1 v2 = NumericComparison f v1 v2
